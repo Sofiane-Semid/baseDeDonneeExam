@@ -52,9 +52,9 @@ INNER JOIN Joueurs.Joueur J
     ON M.MembreID = J.MembreID
 INNER JOIN Joueurs.StatistiquesAnneeJoueur S
     ON S.JoueurID = J.JoueurID;
-Go
+Go*/
 
-*/
+
 
 
 
@@ -80,7 +80,7 @@ Go
 
 
 -- VOTRE RÉPONSE 
-/*SELECT SUM(ISNULL(NbTournoisGagnes, 0)) AS [Nb tournois gagnés rang 6DAN]
+/*SELECT SUM(ISNULL(NbTournoisGagnes,0)) AS [Nb tournois gagnés rang 6DAN]
 FROM Joueurs.vw_StatistiquesJoueur
 WHERE Rang = '6DAN';*/
 
@@ -121,7 +121,7 @@ WHERE Rang = '6DAN';*/
 
 
 -- VOTRE RÉPONSE 
-/*SELECT Nom, prenom, SUM(ISNULL(NbTournoisGagnes, 0)) AS [Nb tournois gagnés]
+/*SELECT Nom, Prenom, SUM(ISNULL(NbTournoisGagnes, 0)) AS [Nb tournois gagnés]
 FROM Joueurs.vw_StatistiquesJoueur
 Group by nom , prenom
 HAVING SUM(ISNULL(NbTournoisGagnes, 0)) > 2
@@ -175,25 +175,25 @@ ORDER BY [NB Tournois Gagnés] DESC;*/
 
 
 -- VOTRE RÉPONSE 
-/*GO
-SELECT M.Nom, M.Prenom, S.NbPartiesJouees
+/*SELECT
+    M.Nom,
+    M.Prenom,
+    S.NbPartiesJouees
 FROM Joueurs.Membre M
 INNER JOIN Joueurs.Joueur J
     ON M.MembreID = J.MembreID
 INNER JOIN Joueurs.StatistiquesAnneeJoueur S
     ON S.JoueurID = J.JoueurID
 WHERE S.Annee = 2023
+  AND S.NbPartiesJouees IS NOT NULL
   AND S.NbPartiesJouees > ALL (
         SELECT S2.NbPartiesJouees
         FROM Joueurs.StatistiquesAnneeJoueur S2
-        WHERE S2.Annee <> 2023
+        WHERE S2.Annee = 2023
+          AND S2.JoueurID <> S.JoueurID
           AND S2.NbPartiesJouees IS NOT NULL
   );
-GO*/
-
-
---?????????????????????????????????????
-
+  */
 
 
 
@@ -230,6 +230,14 @@ GO*/
 
 
 -- VOTRE RÉPONSE 
+/*Select L.TournoiID,T.Annee, T.Saison, Sum(Cout * NbJoueursInscrits) AS [MontantTotal]
+from Tournois.TournoiLigue L
+inner join Tournois.Tournoi T
+on L.TournoiID = T.TournoiID
+group by L.TournoiID, T.Annee, T.Saison;
+*/
+
+
 
 
 
@@ -276,6 +284,13 @@ GO*/
 
 
 -- VOTRE RÉPONSE 
+/*select Nom, Prenom, Rang,
+IIF(s.NbTournoisJoues >= 3,'Joueur régulier','Joueur occassionnel') As [Catégorie Joueur]
+from Joueurs.Membre M
+inner join Joueurs.Joueur J
+on M.MembreID = J.MembreID
+inner join Joueurs.StatistiquesAnneeJoueur S
+on J.JoueurID = s.JoueurID*/
 
 
 
@@ -317,7 +332,19 @@ GO*/
 
 
 -- VOTRE RÉPONSE 
-
+/*select Nom,
+Prenom, 
+Rang,
+[Catégorie Joueur] = CASE 
+WHEN S.NbTournoisJoues >= 3 THEN 'Joueur régulier'
+        WHEN S.NbTournoisJoues = 2 THEN 'Joueur occasionnel'
+        WHEN S.NbTournoisJoues <= 1 THEN 'Nouveau joueur'
+END
+from Joueurs.Membre M
+inner join Joueurs.Joueur J
+on M.MembreID = J.MembreID
+inner join Joueurs.StatistiquesAnneeJoueur S
+on J.JoueurID = s.JoueurID*/
 
 
 
@@ -364,6 +391,25 @@ GO*/
 
 
 -- VOTRE RÉPONSE 
+/*;WITH MoyenneParties As
+(
+Select AVG(S.NbPartiesJouees) As MoyenneParties
+    FROM Joueurs.StatistiquesAnneeJoueur S
+    WHERE S.Annee BETWEEN 2018 AND 2022
+	
+)
+
+SELECT
+    M.Nom,
+    M.Prenom
+FROM Joueurs.Membre M
+INNER JOIN Joueurs.Joueur J
+    ON M.MembreID = J.MembreID
+INNER JOIN Joueurs.StatistiquesAnneeJoueur S
+    ON J.JoueurID = S.JoueurID
+CROSS JOIN MoyenneParties MP
+WHERE S.Annee BETWEEN 2018 AND 2022
+  AND S.NbPartiesJouees > MP.MoyenneParties*/
 
 
 
@@ -396,6 +442,24 @@ GO*/
 
 
 -- VOTRE RÉPONSE 
+/*Go
+create or Alter function Joueurs.ufn_NbPartiesPerdues
+(
+@JoueurId Int,
+@Annee Int 
+)
+returns Int
+As 
+Begin
+Return(
+Select NbPartiesJouees - NbPartiesGagnees
+from Joueurs.StatistiquesAnneeJoueur S
+where S.JoueurID = @JoueurId
+and S.Annee = @Annee
+);
+End */
+
+
 
 
 
@@ -428,10 +492,9 @@ GO*/
 
 
 
+
 -- VOTRE RÉPONSE 
-
-
-
+/*SELECT Joueurs.ufn_NbPartiesPerdues(1, 2015) AS [Nb parties perdues en 2015];*/
 
 
 
@@ -469,6 +532,36 @@ ADD NbPartiesPerdues INT NULL*/
 
 
 -- VOTRE RÉPONSE 
+/*GO
+CREATE OR ALTER PROCEDURE Joueurs.UpdateNbPartiesPerdues
+(
+@JoueurID Int,
+@Annee Int
+)
+
+As
+Begin
+Declare @NbPartiesPerdues int;
+
+Select @NbPartiesPerdues = Joueurs.ufn_NbPartiesPerdues(@JoueurID, @Annee);
+
+IF @NbPartiesPerdues > 0
+    BEGIN
+        UPDATE Joueurs.StatistiquesAnneeJoueur
+        SET NbPartiesPerdues = @NbPartiesPerdues
+        WHERE JoueurID = @JoueurID
+          AND Annee = @Annee;
+    END
+    ELSE
+    BEGIN
+        UPDATE Joueurs.StatistiquesAnneeJoueur
+        SET NbPartiesPerdues = NULL
+        WHERE JoueurID = @JoueurID
+          AND Annee = @Annee;
+    END
+END
+GO
+*/
 
 
 
@@ -530,13 +623,21 @@ ADD NbPartiesPerdues INT NULL*/
 
 
 -- VOTRE RÉPONSE 
+/*SELECT *
+FROM Joueurs.StatistiquesAnneeJoueur
+WHERE JoueurID = 1
+  AND Annee = 2015;
 
+EXEC Joueurs.UpdateNbPartiesPerdues @JoueurID = 1, @Annee = 2015;*/
 
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+/*SELECT *
+FROM Joueurs.StatistiquesAnneeJoueur
+WHERE JoueurID = 4
+  AND Annee = 2015;*/
 
-
-
-
+ /* EXEC Joueurs.UpdateNbPartiesPerdues @JoueurID = 4, @Annee = 2015;*/
 
 
 --                                   █▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█
@@ -578,6 +679,20 @@ ADD NbPartiesPerdues INT NULL*/
 
 
 -- VOTRE RÉPONSE 
+/*GO
+CREATE OR ALTER TRIGGER Joueurs.utrg_DepartDunMembre
+ON Joueurs.Membre
+AFTER UPDATE
+AS
+BEGIN
+    UPDATE J
+    SET EstActif = 0
+    FROM Joueurs.Joueur J
+    INNER JOIN inserted I
+        ON J.MembreID = I.MembreID
+    WHERE I.DateDepart IS NOT NULL;
+END
+GO*/
 
 
 
@@ -630,10 +745,30 @@ ADD NbPartiesPerdues INT NULL*/
 
 -- VOTRE RÉPONSE 
 
+/*SELECT *
+FROM Joueurs.Membre
+WHERE MembreID = 200;
 
+SELECT *
+FROM Joueurs.Joueur
+WHERE MembreID = 200;
 
+-- 3. Mettre à jour le champ DateDepart avec GETDATE() pour le MembreID = 200
+UPDATE Joueurs.Membre
+SET DateDepart = GETDATE()
+WHERE MembreID = 200;
 
+-- 4. Afficher le contenu de la table Membre pour le MembreID = 200
+SELECT *
+FROM Joueurs.Membre
+WHERE MembreID = 200;
 
+-- 5. Afficher le contenu de la table Joueur pour le MembreID = 200
+SELECT *
+FROM Joueurs.Joueur
+WHERE MembreID = 200;
+
+*/
 
 
 
